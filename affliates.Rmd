@@ -1,0 +1,294 @@
+---
+title: "Digitization support for affiliate libraries via Imaging Services"
+output: 
+  html_document: 
+    theme: paper
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+rm(list = ls()) # clear env vars
+
+pkgs.inst <- as.data.frame(installed.packages(noCache = TRUE)) # list of installed R packages
+
+pkgs.load <- c( # default list of packages to load
+  "readr",
+  "readxl",
+  "DT",
+  "digest",
+  "DiagrammeR",
+  "pandoc",
+  # "esquisse", # GUI ggplot 
+  "vroom", # loads data fast
+  "tidylog",
+  "glue", # join strings neatly
+  #"tsibble", # time series data
+  "tidytext", # pull apart text data, count elements
+  "dplyr",
+  # "stats",
+  "ggplot2",
+  "plotly",
+  "scales",
+  "RColorBrewer",
+  # "janitor", # clean-up messy col names janitor::clean_names()
+  "lubridate",
+  "htmlTable",
+  "utf8",
+  "RCurl",
+  "tidyr",
+  "xtable",
+  "tidyverse",
+  "jsonlite",
+  # "Rtools",
+  "formattable"
+)
+#
+idx <- pkgs.load %in% pkgs.inst$Package == FALSE # index of packages that need to be installed
+# pkgs.load[idx]
+if(sum(idx) > 0){install.packages(pkgs.load[idx],dependencies = TRUE)} # if at least one package needs installing, run.
+lapply(pkgs.load, require, character.only = TRUE) # require packages be loaded into current env
+##
+timezone <- "US/Eastern" #Set timezone # set TZ
+if(is.na(Sys.timezone()) == TRUE){
+  Sys.setenv(TZ=timezone)
+}
+##
+os <- .Platform$OS.type
+os <- Sys.info()[[1]][1] #windows linux # identify OS
+#
+options(scipen=999)
+# end
+# <style>th,td{padding:5px 5px 5px 5px;}</style>
+
+```
+
+
+```{r funtions, include=FALSE}
+
+fcn.fy <- function(d){ # Function to determine FY from date
+  m <- lubridate::month(d)
+  if(m >= 7){
+    fiscalYear <- lubridate::year(d) + 1
+  } else {
+    fiscalYear <- lubridate::year(d)
+  }
+  return(fiscalYear)
+}
+
+fcn.tbl.generate <- function(df){ # add two args: number-col-name, currency-TRUE-FALSE
+  tbl <-
+  datatable(
+    data = df,
+    options = list(paging = FALSE,scrollY = FALSE, dom = "t"),
+    colnames = names(df),
+    rownames = TRUE,
+    escape = TRUE,
+    style = "auto",
+    fillContainer = TRUE
+    # selection = "disable"
+    # autoHideNavigation = TRUE
+  ) 
+  return(tbl)
+}
+
+```
+
+```{r loadData, include=FALSE, eval=TRUE }
+
+fname.serviceDetails <- "IS_ServiceDetails.xlsx" #### FileName
+file.exists(paste0("P:/R/data/",fname.serviceDetails))
+
+if(os == "Linux") {
+  serviceDetails <-
+    read_excel(paste0("/home/comstock/pCloudDrive/R/data/",fname.serviceDetails))
+} else if (os == "Darwin") {
+  serviceDetails <-
+    read_excel(paste0("~/pCloud Drive/R/data/",fname.serviceDetails))
+} else if (os == "Windows") {
+  serviceDetails <-
+    read_excel(paste0("P:/R/data/",fname.serviceDetails))
+} 
+
+```
+
+```{r serviceDetails, include=FALSE}
+
+start.date.report.period.covered <- "2021-06-30"
+
+names(serviceDetails)
+serviceDetails$`PhotoduplicationDate (Day-Month-Year)` <- as.Date(
+  format.Date(serviceDetails$`PhotoduplicationDate (Day-Month-Year)`,"%Y-%m-%d"),
+  format = "%Y-%m-%d")
+
+sd.trim <- serviceDetails %>%
+  filter(RepoCode != "MUS" &
+           RepoCode != "LAW" &
+           RepoCode != "BAK" &
+           RepoCode != "GUT" &
+           RepoCode != "DIV" &
+           RepoCode != "MULTI" &
+           RepoCode != "KSG" &
+           RepoCode != "MCZ" &
+           RepoCode != "SCH" &
+           RepoCode != "HOU" &
+           RepoCode != "CAB" &
+           RepoCode != "HYL" &
+           RepoCode != "HUA, SCH" &
+           RepoCode != "MAP" &
+           RepoCode != "HUA" &
+           RepoCode != "MED" &
+           RepoCode != "FAL" &
+           RepoCode != "TOZ" &
+           RepoCode != "DES")
+
+sd.trim$`PhotoduplicationDate (Day-Month-Year)` <- as.Date(sd.trim$`PhotoduplicationDate (Day-Month-Year)`) ; class(sd.trim$`PhotoduplicationDate (Day-Month-Year)`)
+
+sd.trim <- sd.trim %>%
+  filter(`PhotoduplicationDate (Day-Month-Year)` > start.date.report.period.covered)
+sd.trim["FY"] <- NA
+
+i <- 1
+n <- nrow(sd.trim)
+while(i <= n){
+  d <- sd.trim$`PhotoduplicationDate (Day-Month-Year)`[i]
+  sd.trim$FY[i] <- fcn.fy(d)
+  i <- i + 1
+}
+
+unique(sd.trim$RepoCode)
+unique(sd.trim$ActivityName)
+
+omit.list <- c(
+  "COVID-19  Online Teaching Support - Reserve Scanning - FAS",
+  "Judaica, Born Digital - Ongoing Deposit",
+  "Widener Preservation Review",
+  "General Pamphlet Digitization Program",
+  "Women's Worlds in Qajar Iran",
+  "Middle East, Africa, Asia Division Manuscripts",
+  "European political ephemera",
+  "Exams Digitization",
+  "Greek Digital Journal Archive",
+  "Judaica Ephemera",
+  "Digitization for Teaching and Learning - Widener",
+  "Ongoing Photographs Digitization - Widener",
+  "Digital Collections of Cuban Patrimony",
+  "Judaica Posters",
+  "MENAHDA project",
+  "Coptic studies resources (WID DIBAR)",
+  "The Mentor",
+  "Harvard and the Legacy of Slavery (WID DIBAR)",
+  "Widener Preservation Review",
+  "Botany Libraries Ongoing Item Digitization",
+  "Original Botanical Illustrations of the Botany Libraries",
+  "Reserves Scanning",
+  "Harvard and the Legacy of Slavery (WID DIBAR)" ,
+  "Coptic studies resources (WID DIBAR)",
+  "Nature Prints - Botany Libraries",
+  "Russian Elections Ephemera",
+  "Digitization for Teaching and Learning - Botany Libraries",
+  "Soviet Pins",
+  "Gorevitz Collection",
+  "Andy Knoll Field Notes",
+  "NELC – Giza Project Digital Images",
+  "Contagion"     
+)
+
+# i <- 1
+# n <- length(omit.list)
+# while(i <= n){
+
+idx <- sd.trim$ActivityName %in% omit.list ; sum(idx)
+tmp <- sd.trim[!idx,]
+# idx <- grepl("COVID", ignore.case = TRUE,sd.trim$ActivityName) == FALSE
+# x <- sd.trim[idx,]
+
+#------------#
+
+fee.based.df <- tmp %>%
+  filter(PaymentMethod == "Billing Account") %>%
+  mutate("Total" = UnitFee * Quantity) %>%
+  group_by(Project = ActivityName,FY) %>%
+  reframe(RepositoryCode = unique(RepoCode),Dollars = sum(Total)) %>%
+  arrange(Project)
+
+allocation.supported.df <- tmp %>%
+  filter(PaymentMethod != "Billing Account") %>%
+  mutate("Total" = UnitFee * Quantity) %>%
+  group_by(Project = ActivityName,FY) %>%
+  reframe(RepositoryCode = unique(RepoCode),Dollars = sum(Total)) %>%
+  arrange(Project)
+
+write_csv(tmp,file = "affiliates.csv")
+write_csv(fee.based.df,file = "affiliates_HL_collected_fees.csv")
+write_csv(allocation.supported.df,file = "affiliates_HL_allocation_supported.csv")
+
+# --- #
+
+tbl.fee.based <- fcn.tbl.generate(fee.based.df)
+
+fee.ttl <- sum(fee.based.df$Dollars)
+dollar(fee.ttl,big.mark = ",",accuracy = NULL)
+
+tbl.allocation.supported <- fcn.tbl.generate(allocation.supported.df)
+
+alloc.ttl <- sum(allocation.supported.df$Dollars,accuracy = NULL)
+
+```
+
+```{r periodCovered, include=FALSE}
+
+fmt.start.date.report.period.covered <- format.Date(start.date.report.period.covered, "%B %d, %Y")
+fmt.lastEntry.date.report.period.covered <- format.Date(max(tmp$`PhotoduplicationDate (Day-Month-Year)`),"%B %d, %Y")
+
+```
+
+Note: Fees are calculated to recover staff-costs for image-making staff (those working on cameras and scanners) and their immediate supervisors. Project coordination, descriptive metadata support (if any), and DRS depositing are supporting services for which fees are not charged or calculated.
+
+#### Source data
+
+* **Master table of digitization project data**, <a href="https://harvard.bi.atlas-sys.com/?dashboardId=B1E8C103-605A-4E25-B0A2-020283644E20">`IS - ServiceDetails`</a>.
+* **Services to *affiliate* libraries**, derived from **master table of digitization project data**, <a href="affiliates.csv">`affiliates.csv`</a>.
+* **Fee-based services to *affiliate* libraries**, derived from **`affiliates.csv`**, <a href="affiliates_HL_collected_fees.csv">`affiliates_HL_collected_fees.csv`</a>.
+* **Services provided at no charge to *affiliate* libraries**, derived from **`affiliates.csv`**, <a href="affiliates_HL_allocation_supported.csv">`affiliates_HL_allocation_supported.csv`</a>.
+
+#### Reporting period
+
+*`r fmt.start.date.report.period.covered` to `r fmt.lastEntry.date.report.period.covered` (last entry)*
+
+## Harvard Library received fees for the following projects
+
+`r tbl.fee.based`
+
+#### Total = `r dollar(fee.ttl,big.mark = ",")`
+
+---
+
+## Harvard Library supported the following projects at no cost
+
+`r tbl.allocation.supported`
+
+#### Total = `r dollar(alloc.ttl,big.mark = ",")`
+
+
+```{r tail, include=FALSE}
+lastRevised <- timestamp(prefix = "last revised: ",suffix = "")
+
+htmlFileSource <- "affliates.html"
+sFile_01 <- "affiliates.csv" ; file.exists(sFile_01)
+feeFile <- "affiliates_HL_collected_fees.csv" ; file.exists(feeFile)
+allocFile <- "affiliates_HL_allocation_supported.csv" ; file.exists(allocFile)
+
+file.copy(from = sFile_01, to = paste0("./affiliates_upload/",sFile_01),overwrite = TRUE)
+file.copy(from = feeFile, to = paste0("./affiliates_upload/",feeFile),overwrite = TRUE)
+file.copy(from = allocFile, to = paste0("./affiliates_upload/",allocFile),overwrite = TRUE)
+
+file.copy(from = htmlFileSource, to = "./affiliates_upload/index.html",overwrite = TRUE)
+
+```
+
+---
+
+<center><small>`r lastRevised`</small></center>
+<br /><br />
+
