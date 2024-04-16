@@ -130,7 +130,7 @@ sd.trim <- serviceDetails %>%
            RepoCode != "MULTI" &
            RepoCode != "KSG" &
            RepoCode != "MCZ" &
-           RepoCode != "SCH" &
+          # RepoCode != "SCH" &
            RepoCode != "HOU" &
            RepoCode != "CAB" &
            RepoCode != "HYL" &
@@ -279,11 +279,13 @@ sFile_01 <- "affiliates.csv" ; file.exists(sFile_01)
 feeFile <- "affiliates_HL_collected_fees.csv" ; file.exists(feeFile)
 allocFile <- "affiliates_HL_allocation_supported.csv" ; file.exists(allocFile)
 
-file.copy(from = sFile_01, to = paste0("./affiliates_upload/",sFile_01),overwrite = TRUE)
-file.copy(from = feeFile, to = paste0("./affiliates_upload/",feeFile),overwrite = TRUE)
-file.copy(from = allocFile, to = paste0("./affiliates_upload/",allocFile),overwrite = TRUE)
+# file.copy(from = sFile_01, to = paste0("./affiliates_upload/",sFile_01),overwrite = TRUE)
+# file.copy(from = feeFile, to = paste0("./affiliates_upload/",feeFile),overwrite = TRUE)
+# file.copy(from = allocFile, to = paste0("./affiliates_upload/",allocFile),overwrite = TRUE)
+# 
+# file.copy(from = htmlFileSource, to = "./affiliates_upload/index.html",overwrite = TRUE)
 
-file.copy(from = htmlFileSource, to = "./affiliates_upload/index.html",overwrite = TRUE)
+file.copy(from = htmlFileSource, to = "index.html",overwrite = TRUE)
 
 ```
 
