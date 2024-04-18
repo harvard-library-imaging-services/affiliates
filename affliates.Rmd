@@ -264,7 +264,7 @@ Note: Fees are calculated to recover staff-costs for image-making staff (those w
 
 ---
 
-## Harvard Library supported the following projects at no cost
+## Harvard Library supported the following projects at no cost to affiliates
 
 `r tbl.allocation.supported`
 
@@ -285,6 +285,7 @@ allocFile <- "affiliates_HL_allocation_supported.csv" ; file.exists(allocFile)
 # 
 # file.copy(from = htmlFileSource, to = "./affiliates_upload/index.html",overwrite = TRUE)
 
+file.copy(from = htmlFileSource, to = "index.html",overwrite = TRUE)
 file.copy(from = htmlFileSource, to = "index.html",overwrite = TRUE)
 
 ```
